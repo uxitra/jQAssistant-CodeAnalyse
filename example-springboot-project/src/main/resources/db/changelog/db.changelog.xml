@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="202402031604" author="uxitraThorsten">
+        <createTable tableName="movie">
+            <column name="id" type="varchar(255)">
+                <constraints primaryKey="true" primaryKeyName="movie_id_pk"/>
+            </column>
+            <column name="title" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="duration_in_minutes" type="int">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addDefaultValue tableName="movie" columnName="id" defaultValueComputed="RANDOM_UUID()"/>
+
+        <createTable tableName="theater">
+            <column name="id" type="varchar(255)">
+                <constraints primaryKey="true" primaryKeyName="theater_id_pk"/>
+            </column>
+            <column name="name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="number_of_seats" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addDefaultValue tableName="theater" columnName="id" defaultValueComputed="RANDOM_UUID()"/>
+
+        <createTable tableName="schedule">
+            <column name="id" type="varchar(255)">
+                <constraints primaryKey="true" primaryKeyName="schedule_id_pk"/>
+            </column>
+            <column name="movie_id" type="varchar(255)">
+                <constraints nullable="false" foreignKeyName="schedule_movie_fk" references="movie(id)"/>
+            </column>
+            <column name="theater_id" type="varchar(255)">
+                <constraints nullable="false" foreignKeyName="schedule_theater_fk" references="theater(id)"/>
+            </column>
+            <column name="start_time" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addDefaultValue tableName="schedule" columnName="id" defaultValueComputed="RANDOM_UUID()"/>
+
+
+        <insert tableName="movie">
+            <column name="title">Alien</column>
+            <column name="duration_in_minutes">116</column>
+        </insert>
+        <insert tableName="theater">
+            <column name="name">Empire</column>
+            <column name="number_of_seats">430</column>
+        </insert>
+        <insert tableName="schedule">
+            <column name="movie_id" valueComputed="(select id from movie where title='Alien')"/>
+            <column name="theater_id" valueComputed="(select id from theater where name='Empire')"/>
+            <column name="start_time">2024-02-03 16:04:00</column>
+        </insert>
+    </changeSet>
+</databaseChangeLog>

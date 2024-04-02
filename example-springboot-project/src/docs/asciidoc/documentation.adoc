@@ -1,0 +1,4 @@
+= Projektdokumentation
+
+== jqAssistant
+include::jQAssistant:Rules[]
