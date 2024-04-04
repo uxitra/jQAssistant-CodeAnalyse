@@ -4,7 +4,7 @@ Dieses Repository zeigt verschiedene Möglichkeiten zur Codeanalyse mit jQAssist
 
 
 Zusätzliche Informationen findet ihr in der zugehörigen Blogreihe:
-* Teil 1: [jQAssistant in die eigene Codebasis integrieren]()
+* Teil 1: [jQAssistant in die eigene Codebasis integrieren](https://uxitra.de/2024/04/04/codestrukturanalyse-mit-jqassistant-teil-1/)
 * Teil 2: folgt ...
 
 ## Aufbau
