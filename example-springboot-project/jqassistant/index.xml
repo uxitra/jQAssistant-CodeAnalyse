@@ -1,0 +1,12 @@
+<jqassistant-rules
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://schema.jqassistant.org/rule/v1.10"
+        xsi:schemaLocation="http://schema.jqassistant.org/rule/v1.10 https://schema.jqassistant.org/rule/jqassistant-rule-v1.10.xsd">
+
+    <group id="default">
+        <includeConcept refId="common:*"/>
+        <includeConcept refId="metrics:*"/>
+        <includeConstraint refId="metrics:*"/>
+    </group>
+
+</jqassistant-rules>

@@ -1,4 +1,13 @@
 = Projektdokumentation
+:toc: left
+:toclevels: 4
 
 == jqAssistant
-include::jQAssistant:Rules[]
+
+=== Constraints
+
+include::jQAssistant:Summary[constraints="*"]
+
+=== Metriken
+
+include::jQAssistant:Rules[concepts="metrics:*",leveloffset=+3]

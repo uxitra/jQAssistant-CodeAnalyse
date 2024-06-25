@@ -1,0 +1,144 @@
+<jqassistant-rules
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://schema.jqassistant.org/rule/v1.10"
+        xsi:schemaLocation="http://schema.jqassistant.org/rule/v1.10 https://schema.jqassistant.org/rule/jqassistant-rule-v1.10.xsd">
+
+    <!-- ######## -->
+    <!-- Concepts -->
+    <!-- ######## -->
+
+    <concept id="metrics:locAndCc">
+        <description>Types with the highest LoC (lines of code) and aggregated CC (cyclomatic complexity)
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (type:Type)-[:DECLARES]->(method:Method)
+            RETURN
+                type.fqn AS Type, sum(method.effectiveLineCount) AS LoC, sum(method.cyclomaticComplexity) AS CC
+            ORDER BY
+                LoC DESC, CC DESC
+            LIMIT
+                20
+    ]]></cypher>
+    </concept>
+
+    <concept id="metrics:ClassesWithHighestNumberOfMethods">
+        <description>A list of classes with the highest number of methods</description>
+        <cypher><![CDATA[
+            MATCH
+                (class:Class)-[:DECLARES]->(method:Method)
+            RETURN
+                class.fqn AS Class , count(method) AS Methods
+            ORDER BY
+                Methods DESC
+            LIMIT
+                20
+        ]]></cypher>
+    </concept>
+
+    <concept id="metrics:MethodsWithHighestNumberOfParameters">
+        <description>Methods with the highest number of parameters</description>
+        <cypher><![CDATA[
+            MATCH
+                (type:Type)-[:DECLARES]->(method:Method)-[:HAS]->(parameter:Parameter)
+            RETURN
+                type.fqn AS Type, method.name AS Method, count(parameter) AS parameterCount
+            ORDER
+                BY parameterCount DESC
+            LIMIT
+                20
+        ]]></cypher>
+    </concept>
+
+    <concept id="metrics:ClassesWithDeepestInheritanceHierarchy">
+        <description>Classes with the deepest inheritance hierarchy</description>
+        <cypher><![CDATA[
+            MATCH
+                path=(class:Class)-[:EXTENDS*]->(super:Class)
+            RETURN
+                class.fqn AS Class, length(path) AS Depth
+            ORDER BY
+                Depth DESC
+            LIMIT
+                20
+        ]]></cypher>
+    </concept>
+
+    <concept id="metrics:TypesWithHighestNumberOfRelations">
+        <description>Types which are related the most</description>
+        <cypher><![CDATA[
+            MATCH
+                (:Package)-[:CONTAINS]->(type:Type)<-[relation]-(:Type)
+            RETURN
+                type.fqn AS Type, count(relation) AS Relations
+            ORDER BY
+                Relations DESC
+            LIMIT
+                20
+        ]]></cypher>
+    </concept>
+
+    <concept id="metrics:MostChangedTypes">
+        <requiresConcept refId="common:ConnectGitFilesAndTypes"/>
+        <description>Most changed Types</description>
+        <cypher><![CDATA[
+            MATCH
+                (commit:Git:Commit)-[:CONTAINS_CHANGE]->(:Git:Change)-[:MODIFIES]->(:Git:File)-[:CONTAINS]->(type:Type)
+            RETURN
+                type.fqn AS Type, count(commit) AS NumberOfCommits
+            ORDER BY
+                NumberOfCommits DESC
+            LIMIT
+                20
+        ]]></cypher>
+    </concept>
+
+    <concept id="metrics:SlowTests">
+        <description>Slowest test cases</description>
+        <cypher><![CDATA[
+            MATCH
+                (testCase:JUnit:TestCase)
+            RETURN
+                testCase.className AS Class, testCase.name AS MethodName, testCase.time AS ExecutionTimeInSeconds
+            ORDER BY
+                testCase.time DESC
+            LIMIT
+                20
+        ]]></cypher>
+    </concept>
+
+    <concept id="metrics:CcTestCoverage">
+        <description>Test coverage of classes with high cyclomatic complexity</description>
+        <cypher><![CDATA[
+            MATCH
+                (class:Jacoco:Class)-[:HAS_METHOD]->(method:Jacoco:Method)-[:HAS_COUNTER]->(counter:Jacoco:Counter)
+            WHERE
+                counter.type = 'COMPLEXITY'
+            WITH
+                class, sum(counter.covered) AS Covered, sum(counter.covered) + sum(counter.missed) AS CC
+            RETURN
+                class.fqn AS Class, CC, Covered * 100 / CC AS CoverageInPercent
+            ORDER BY
+                CC DESC, CoverageInPercent DESC
+        ]]></cypher>
+    </concept>
+
+    <!-- ########### -->
+    <!-- Constraints -->
+    <!-- ########### -->
+
+    <constraint id="metrics:MethodsMustHaveLessThan10Parameters">
+        <description>Breaks the build if there are methods 10 parameters or more</description>
+        <cypher><![CDATA[
+            MATCH
+                (class:Class)-[:DECLARES]->(method:Method)-[:HAS]->(parameter:Parameter)
+            WITH
+                class, method, count(parameter) AS parameterCount
+            WHERE
+                parameterCount >= 10
+            RETURN
+                class.fqn AS Class, method.name AS Method, parameterCount
+        ]]></cypher>
+    </constraint>
+
+</jqassistant-rules>
