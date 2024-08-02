@@ -1,0 +1,301 @@
+<jqassistant-rules xmlns="http://schema.jqassistant.org/rule/v2.2"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://schema.jqassistant.org/rule/v2.2 https://schema.jqassistant.org/rule/jqassistant-rule-v2.2.xsd">
+
+    <concept id="structure:PackageDependencies">
+        <description>Creates a new `DEPENDS_ON` relations between all packages</description>
+        <cypher><![CDATA[
+            MATCH
+                (package1:Package)-[:CONTAINS*]->(type1:Type),
+                (package2:Package)-[:CONTAINS*]->(type2:Type),
+                (type1)-[:DEPENDS_ON]->(type2)
+            WHERE
+                package1 <> package2
+            WITH
+                package1, package2, COUNT(*) AS weight
+            MERGE
+                (package1)-[dependency:DEPENDS_ON]->(package2)
+            SET
+                dependency.weight = weight
+            RETURN
+                COUNT(dependency) AS CreatedDependencies
+        ]]></cypher>
+    </concept>
+
+    <concept id="structure:Component">
+        <description>
+            All packages under the root package of the main artifact are labeled as `Component`.
+            All packages under `Component` packages are labeled as `SubComponent`
+        </description>
+        <cypher><![CDATA[
+        MATCH
+            (:Main:Artifact)-[:CONTAINS]->(rootPackage:Package)-[:CONTAINS]->(component:Package)-[:CONTAINS]->(subComponent:Package)
+        WHERE
+             rootPackage.fqn = 'com.example.moviescheduler'
+        SET
+            component:Component, subComponent:SubComponent
+        WITH
+            component, collect(subComponent.name) AS UnsortedSubComponents
+        UNWIND
+            UnsortedSubComponents AS subComponentName
+        WITH
+            component, subComponentName
+        ORDER BY
+            subComponentName
+        RETURN
+            component.name AS Component, collect(subComponentName) AS SubComponents
+        ORDER BY
+            component.name
+    ]]></cypher>
+    </concept>
+
+    <concept id="structure:AfferentCouplingOfComponent">
+        <requiresConcept refId="structure:Component"/>
+        <requiresConcept refId="structure:PackageDependencies"/>
+        <description>The number of classes outside this component that depend on classes within this component. In
+            short: the number of incoming dependencies
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (component:Component)
+            OPTIONAL MATCH
+                (component)<-[dependency:DEPENDS_ON]-(:Component)
+            WITH
+                component, sum(dependency.weight) AS afferentCouplings
+            SET
+                component.ca = afferentCouplings
+            RETURN
+                component.name AS Component, afferentCouplings AS AfferentCouplings
+            ORDER BY
+                Component DESC
+        ]]></cypher>
+    </concept>
+
+    <concept id="structure:EfferentCouplingOfComponent">
+        <requiresConcept refId="structure:Component"/>
+        <requiresConcept refId="structure:PackageDependencies"/>
+        <description>The number of classes inside this component that depends on classes outside this component. In
+            short: the number of outgoing dependencies
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (component:Component)
+            OPTIONAL MATCH
+                (component)-[dependency:DEPENDS_ON]->(:Component)
+            WITH
+                component, sum(dependency.weight) AS efferentCouplings
+            SET
+                component.ce = efferentCouplings
+            RETURN
+                component.name AS Component, efferentCouplings AS EfferentCouplings
+            ORDER BY
+                Component DESC
+        ]]></cypher>
+    </concept>
+
+    <concept id="structure:InstabilityOfComponent">
+        <requiresConcept refId="structure:AfferentCouplingOfComponent"/>
+        <requiresConcept refId="structure:EfferentCouplingOfComponent"/>
+        <description>This metric has the range [0, 1]. I=0 indicates a maximally stable component. That means no type
+            (neither an interface nor a class) in this package has a dependency on any other interface or class in
+            another package. I=1 indicates a maximally unstable component. That means no type (either interfaces or
+            classes) in this package have no dependency on any other interfaces or classes in another package. In other
+            words, all interfaces or classes in this package have at least one dependency to an interface or class in
+            another package
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (component:Component)
+            WHERE
+                component.ce + component.ca > 0
+            WITH
+                component, toFloat(component.ce) / (component.ce + component.ca) AS instability
+            SET
+                component.instability = round(instability,2)
+            RETURN
+                component.name AS Component, component.instability AS Instability
+            ORDER BY
+                Component DESC
+        ]]></cypher>
+    </concept>
+
+    <constraint id="structure:StableComponentDependencies">
+        <requiresConcept refId="structure:ComponentDependencies"/>
+        <requiresConcept refId="structure:InstabilityOfComponent"/>
+        <description>A stable component must not depend on an unstable component</description>
+        <cypher><![CDATA[
+            MATCH
+                (c1:Component)-[:DEPENDS_ON]->(c2:Component)
+            WHERE
+                c1.instability < c2.instability
+            RETURN
+                c1.name AS Component, c1.instability AS ComponentInstability, c2.name AS Dependency, c2.instability AS DependencyInstability,  round(c2.instability - c1.instability,2) AS Difference
+            ORDER BY
+                Difference DESC
+        ]]></cypher>
+    </constraint>
+
+    <concept id="structure:AfferentCouplingOfSubComponent">
+        <requiresConcept refId="structure:Component"/>
+        <requiresConcept refId="structure:PackageDependencies"/>
+        <description>Set a new property `ca` for each SubComponent which holds the sum of all incoming dependencies from
+            other SubComponents under the same Component
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (component:Component)-[:CONTAINS]->(subComponent:SubComponent)
+            OPTIONAL MATCH
+                (subComponent)<-[dependency:DEPENDS_ON]-(:SubComponent)<-[:CONTAINS]-(component)
+            WITH
+                component, subComponent, sum(dependency.weight) AS afferentCouplings
+            SET
+                subComponent.ca = afferentCouplings
+            RETURN
+                component.name AS Component, subComponent.name AS SubComponent, afferentCouplings AS AfferentCouplings
+            ORDER BY
+                Component DESC, SubComponent DESC
+        ]]></cypher>
+    </concept>
+
+    <concept id="structure:EfferentCouplingOfSubComponent">
+        <requiresConcept refId="structure:Component"/>
+        <requiresConcept refId="structure:PackageDependencies"/>
+        <description>Set a new property `ce` for each SubComponent which holds the sum of all outgoing dependencies from
+            other SubComponents under the same Component
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (component:Component)-[:CONTAINS]->(subComponent:SubComponent)
+            OPTIONAL MATCH
+                (subComponent)-[dependency:DEPENDS_ON]->(:SubComponent)<-[:CONTAINS]-(component)
+            WITH
+                component, subComponent, sum(dependency.weight) AS efferentCouplings
+            SET
+                subComponent.ce = efferentCouplings
+            RETURN
+                component.name AS Component, subComponent.name AS SubComponent, efferentCouplings AS EfferentCouplings
+            ORDER BY
+                Component DESC, SubComponent DESC
+        ]]></cypher>
+    </concept>
+
+    <concept id="structure:InstabilityOfSubComponent">
+        <requiresConcept refId="structure:AfferentCouplingOfComponent"/>
+        <requiresConcept refId="structure:EfferentCouplingOfComponent"/>
+        <description>Set a new `instability` property for each SubComponent with the range [0, 1].
+            instability=0 indicates a maximally stable SubComponent.
+            That means no type in this SubComponent has a dependency on any other type in another SubComponent of the
+            same Component.
+            instability=1 indicates a maximally unstable SubComponent.
+            That means no type in this SubComponent is depended by any other type in another SubComponent of the same
+            Component.
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (component:Component)-[:CONTAINS]->(subComponent:SubComponent)
+            WHERE
+                subComponent.ce + subComponent.ca > 0
+            WITH
+                component, subComponent, toFloat(subComponent.ce) / (subComponent.ce + subComponent.ca) AS instability
+            SET
+                subComponent.instability = round(instability, 2)
+            RETURN
+               component.name AS Component, subComponent.name AS SubComponent, subComponent.instability AS Instability
+            ORDER BY
+                Component DESC, SubComponent DESC
+        ]]></cypher>
+    </concept>
+
+    <constraint id="structure:StableSubComponentDependencies">
+        <requiresConcept refId="structure:ComponentDependencies"/>
+        <requiresConcept refId="structure:InstabilityOfComponent"/>
+        <description>A stable SubComponent must not depend on an unstable SubComponent inside the same Component
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (c:Component)-[:CONTAINS]->(subComponent1:SubComponent)-[:DEPENDS_ON]->(subComponent2:SubComponent)<-[:CONTAINS]-(c)
+            WHERE
+                subComponent1.instability < subComponent2.instability
+            RETURN
+                subComponent1.name AS SubComponent, subComponent1.instability AS SubComponentInstability, subComponent2.name AS Dependency, subComponent2.instability AS DependencyInstability,  round(subComponent2.instability - subComponent1.instability,2) AS Difference
+            ORDER BY
+                Difference DESC
+        ]]></cypher>
+    </constraint>
+
+    <concept id="structure:ComponentDependencies">
+        <requiresConcept refId="structure:Component"/>
+        <requiresConcept refId="structure:PackageDependencies"/>
+        <description>Shows the dependencies between components.</description>
+        <cypher><![CDATA[
+            MATCH
+                (component1:Component)-[dependency:DEPENDS_ON]->(component2:Component)
+            RETURN
+                component1, component2, dependency
+        ]]></cypher>
+        <report type="plantuml-component-diagram"/>
+    </concept>
+
+    <concept id="structure:SubComponentDependencies">
+        <requiresConcept refId="structure:Component"/>
+        <requiresConcept refId="structure:PackageDependencies"/>
+        <description>Shows components and their subcomponents with their dependencies.</description>
+        <cypher><![CDATA[
+            MATCH
+                (component:Component)-[:CONTAINS]->(subComponent:SubComponent)
+            OPTIONAL MATCH
+                (subComponent)-[dependency:DEPENDS_ON]->(:SubComponent)
+            RETURN
+                {
+                  role : "graph",
+                  parent : component,
+                  nodes : subComponent,
+                  relationships: dependency
+                }
+        ]]></cypher>
+        <report type="plantuml-component-diagram"/>
+    </concept>
+
+    <constraint id="structure:CyclicComponentDependencies">
+        <requiresConcept refId="structure:ComponentDependencies"/>
+        <description>There must be no cyclic dependencies between components</description>
+        <cypher><![CDATA[
+            MATCH
+                cycle = (component:Component)-[:DEPENDS_ON*]->(component)
+            WHERE
+                ALL(relation IN relationships(cycle) WHERE 'Component' IN LABELS(startNode(relation)) AND 'Component' IN LABELS(endNode(relation)))
+            RETURN
+                component.fqn AS Component, [node IN nodes(cycle) | node.fqn] AS Cycle
+            ORDER BY
+                length(cycle) DESC
+        ]]></cypher>
+    </constraint>
+
+    <concept id="structure:CyclicTypeDependencies">
+        <description>Cyclic dependencies between Types</description>
+        <cypher><![CDATA[
+          OPTIONAL MATCH
+              cycle = (type:Type)-[:DEPENDS_ON*]->(type)
+          RETURN
+              type.fqn AS Type, [node IN nodes(cycle) | node.fqn] AS Cycle
+          ORDER BY
+              length(cycle) DESC
+      ]]></cypher>
+    </concept>
+
+    <constraint id="structure:NoDirectDependencyFromWebToPersistence">
+        <requiresConcept refId="structure:Component"/>
+        <requiresConcept refId="structure:PackageDependencies"/>
+        <description>There must be no direct dependency from the web layer to the persistence layer in any component
+        </description>
+        <cypher><![CDATA[
+            MATCH
+                (web:SubComponent)-[:DEPENDS_ON]->(persistence:SubComponent)
+            WHERE
+                web.name = 'web' AND persistence.name = 'persistence'
+            RETURN
+                web.fqn, persistence.fqn;
+        ]]></cypher>
+    </constraint>
+
+</jqassistant-rules>

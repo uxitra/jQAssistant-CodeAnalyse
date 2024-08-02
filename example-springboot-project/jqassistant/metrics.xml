@@ -1,11 +1,6 @@
-<jqassistant-rules
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns="http://schema.jqassistant.org/rule/v1.10"
-        xsi:schemaLocation="http://schema.jqassistant.org/rule/v1.10 https://schema.jqassistant.org/rule/jqassistant-rule-v1.10.xsd">
-
-    <!-- ######## -->
-    <!-- Concepts -->
-    <!-- ######## -->
+<jqassistant-rules xmlns="http://schema.jqassistant.org/rule/v2.2"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://schema.jqassistant.org/rule/v2.2 https://schema.jqassistant.org/rule/jqassistant-rule-v2.2.xsd">
 
     <concept id="metrics:locAndCc">
         <description>Types with the highest LoC (lines of code) and aggregated CC (cyclomatic complexity)
@@ -53,7 +48,7 @@
     <concept id="metrics:ClassesWithDeepestInheritanceHierarchy">
         <description>Classes with the deepest inheritance hierarchy</description>
         <cypher><![CDATA[
-            MATCH
+            OPTIONAL MATCH
                 path=(class:Class)-[:EXTENDS*]->(super:Class)
             RETURN
                 class.fqn AS Class, length(path) AS Depth
@@ -122,10 +117,6 @@
                 CC DESC, CoverageInPercent DESC
         ]]></cypher>
     </concept>
-
-    <!-- ########### -->
-    <!-- Constraints -->
-    <!-- ########### -->
 
     <constraint id="metrics:MethodsMustHaveLessThan10Parameters">
         <description>Breaks the build if there are methods 10 parameters or more</description>

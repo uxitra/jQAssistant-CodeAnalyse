@@ -11,3 +11,7 @@ include::jQAssistant:Summary[constraints="*"]
 === Metriken
 
 include::jQAssistant:Rules[concepts="metrics:*",leveloffset=+3]
+
+=== Struktur
+
+include::jQAssistant:Rules[concepts="structure:*",leveloffset=+3]

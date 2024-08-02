@@ -1,8 +1,6 @@
-<jqassistant-rules
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns="http://schema.jqassistant.org/rule/v1.10"
-        xsi:schemaLocation="http://schema.jqassistant.org/rule/v1.10 https://schema.jqassistant.org/rule/jqassistant-rule-v1.10.xsd">
-
+<jqassistant-rules xmlns="http://schema.jqassistant.org/rule/v2.2"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://schema.jqassistant.org/rule/v2.2 https://schema.jqassistant.org/rule/jqassistant-rule-v2.2.xsd">
     <concept id="common:ConnectGitFilesAndTypes">
         <description>Create a CONTAINS connection between .java Files and the contained Types`</description>
         <cypher><![CDATA[
@@ -18,6 +16,3 @@
     </concept>
 
 </jqassistant-rules>
-
-
-
